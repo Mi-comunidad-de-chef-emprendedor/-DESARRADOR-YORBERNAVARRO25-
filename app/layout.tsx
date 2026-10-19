@@ -10,7 +10,7 @@ const _sourceSerif_4 = V0_Font_Source_Serif_4({ subsets: ['latin'], weight: ["20
 
 export const metadata: Metadata = {
   title: 'Nexo — Gestión de negocio',
-  description: 'Una forma más clara de gestionar tu negocio.'
+  description: 'Una forma más clara de gestionar tu negocio.',
   generator: 'v0.app',
   icons: {
     icon: [
