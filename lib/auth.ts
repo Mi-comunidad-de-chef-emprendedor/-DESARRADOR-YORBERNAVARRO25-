@@ -1,16 +1,27 @@
 import { betterAuth } from 'better-auth'
 import { pool } from '@/lib/db'
 
-const origin = (value?: string) => (value ? `https://${value}` : undefined)
+const origin = (value?: string) => {
+  if (!value) return undefined
+  return value.startsWith('http://') || value.startsWith('https://') ? value : `https://${value}`
+}
+
+const allowedOrigins = [
+  'http://localhost:3000',
+  process.env.BETTER_AUTH_URL,
+  origin(process.env.VERCEL_URL),
+  origin(process.env.VERCEL_PROJECT_PRODUCTION_URL),
+  process.env.V0_RUNTIME_URL,
+  process.env.V0_DEV_APP_URL,
+  process.env.V0_BUILD_URL,
+  process.env.V0_SANDBOX_URL,
+].filter((value): value is string => Boolean(value))
 
 export const auth = betterAuth({
   database: pool,
   baseURL: process.env.BETTER_AUTH_URL ?? origin(process.env.VERCEL_PROJECT_PRODUCTION_URL) ?? origin(process.env.VERCEL_URL) ?? process.env.V0_RUNTIME_URL,
   emailAndPassword: { enabled: true, autoSignIn: true },
-  trustedOrigins: [
-    ...(process.env.NODE_ENV === 'development' ? ['http://localhost:3000', ...[process.env.V0_RUNTIME_URL, process.env.V0_DEV_APP_URL, process.env.V0_BUILD_URL, process.env.V0_SANDBOX_URL].filter(Boolean) as string[]] : []),
-    ...(process.env.NODE_ENV === 'production' ? [origin(process.env.VERCEL_URL), origin(process.env.VERCEL_PROJECT_PRODUCTION_URL)].filter(Boolean) as string[] : []),
-  ],
+  trustedOrigins: allowedOrigins,
   session: { expiresIn: 60 * 60 * 24 * 7, updateAge: 60 * 60 * 24 },
   ...(process.env.NODE_ENV === 'development' ? { advanced: { defaultCookieAttributes: { sameSite: 'none' as const, secure: true } } } : {}),
 })
