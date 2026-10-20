@@ -1,16 +1,35 @@
 import { betterAuth } from 'better-auth'
 import { pool } from '@/lib/db'
 
-const origin = (value?: string) => {
+const normalizeOrigin = (value?: string) => {
   if (!value) return undefined
-  return value.startsWith('http://') || value.startsWith('https://') ? value : `https://${value}`
+
+  const trimmed = value.trim().replace(/\/+$/, '')
+  if (!trimmed) return undefined
+
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed
+  }
+
+  if (
+    trimmed.includes('localhost') ||
+    trimmed.startsWith('127.0.0.1') ||
+    trimmed.startsWith('[::1]') ||
+    trimmed.startsWith('::1')
+  ) {
+    return `http://${trimmed}`
+  }
+
+  return `https://${trimmed}`
 }
 
 const allowedOrigins = [
   'http://localhost:3000',
-  process.env.BETTER_AUTH_URL,
-  origin(process.env.VERCEL_URL),
-  origin(process.env.VERCEL_PROJECT_PRODUCTION_URL),
+  'http://127.0.0.1:3000',
+  'http://[::1]:3000',
+  normalizeOrigin(process.env.BETTER_AUTH_URL),
+  normalizeOrigin(process.env.VERCEL_URL),
+  normalizeOrigin(process.env.VERCEL_PROJECT_PRODUCTION_URL),
   process.env.V0_RUNTIME_URL,
   process.env.V0_DEV_APP_URL,
   process.env.V0_BUILD_URL,
@@ -19,9 +38,20 @@ const allowedOrigins = [
 
 export const auth = betterAuth({
   database: pool,
-  baseURL: process.env.BETTER_AUTH_URL ?? origin(process.env.VERCEL_PROJECT_PRODUCTION_URL) ?? origin(process.env.VERCEL_URL) ?? process.env.V0_RUNTIME_URL,
+  baseURL:
+    normalizeOrigin(process.env.BETTER_AUTH_URL) ??
+    normalizeOrigin(process.env.VERCEL_PROJECT_PRODUCTION_URL) ??
+    normalizeOrigin(process.env.VERCEL_URL) ??
+    process.env.V0_RUNTIME_URL ??
+    'http://localhost:3000',
   emailAndPassword: { enabled: true, autoSignIn: true },
   trustedOrigins: allowedOrigins,
   session: { expiresIn: 60 * 60 * 24 * 7, updateAge: 60 * 60 * 24 },
-  ...(process.env.NODE_ENV === 'development' ? { advanced: { defaultCookieAttributes: { sameSite: 'none' as const, secure: true } } } : {}),
+  ...(process.env.NODE_ENV === 'development'
+    ? {
+        advanced: { defaultCookieAttributes: { sameSite: 'lax' as const, secure: false } },
+      }
+    : {
+        advanced: { defaultCookieAttributes: { sameSite: 'none' as const, secure: true } },
+      }),
 })
